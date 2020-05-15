@@ -1,11 +1,12 @@
 #!/bin/bash
-
-set -e
-
-for key in $(aws ec2 describe-key-pairs | jq --raw-output '.KeyPairs[].KeyName') ; do
-   usage_count=$(aws ec2 describe-instances --filters "Name=key-name,Values=${key//\\/?}" | jq '.Reservations | length')
-   if [ "$usage_count" == 0 ] ; then
-     echo "$key"
-   fi
+for account in default ; do
+	echo $account >> count_EC2_KeyPairs.txt
+	for key in $(aws --profile $account ec2 describe-key-pairs | jq --raw-output '.KeyPairs[].KeyName') ; do
+		usage_count=$(aws --profile $account ec2 describe-instances --filters "Name=key-name,Values=${key//\\/?}" | jq '.Reservations | length')
+		instance=""
+		if [[ "$usage_count" = "1" ]] ; then
+		  instance=$(aws --profile $account ec2 describe-instances --filters "Name=key-name,Values=${key//\\/?}" --query 'Reservations[].Instances[].[Tags[?Key==`Name`].Value,InstanceId,State.Name]' --output text |tr '\n' ' ')
+		fi
+		echo "| $usage_count | $key | $instance |"  >> count_EC2_KeyPairs.txt
+	  done
 done
-
