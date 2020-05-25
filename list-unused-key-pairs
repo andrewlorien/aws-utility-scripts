@@ -1,12 +1,16 @@
 #!/bin/bash
+outfile="./count_keypairs.md"
 for account in default ; do
-	echo $account >> count_EC2_KeyPairs.txt
-	for key in $(aws --profile $account ec2 describe-key-pairs | jq --raw-output '.KeyPairs[].KeyName') ; do
-		usage_count=$(aws --profile $account ec2 describe-instances --filters "Name=key-name,Values=${key//\\/?}" | jq '.Reservations | length')
-		instance=""
-		if [[ "$usage_count" = "1" ]] ; then
-		  instance=$(aws --profile $account ec2 describe-instances --filters "Name=key-name,Values=${key//\\/?}" --query 'Reservations[].Instances[].[Tags[?Key==`Name`].Value,InstanceId,State.Name]' --output text |tr '\n' ' ')
-		fi
-		echo "| $usage_count | $key | $instance |"  >> count_EC2_KeyPairs.txt
-	  done
+	echo ||$account|| >> $outfile
+	for region in $(aws --profile AT-PROD --region "ap-southeast-2" ec2  describe-regions  --query 'Regions[].RegionName' --output text ); do
+		keys=$(aws --profile $account ec2 describe-key-pairs | jq '.KeyPairs[].KeyName') 
+		for key in ${keys[@]} ; do
+			usage_count=$(aws --profile $account ec2 describe-instances --filters "Name=key-name,Values=${key//\\/?}" | jq '.Reservations | length')
+			instance=""
+			if [[ "$usage_count" = "1" ]] ; then
+			  instance=$(aws --profile $account ec2 describe-instances --filters "Name=key-name,Values=${key//\\/?}" --query 'Reservations[].Instances[].[Tags[?Key==`Name`].Value,InstanceId,State.Name]' --output text |tr '\n' ' ')
+			fi
+			echo "| $region | $usage_count | $key | $instance |"  >> $outfile
+		  done
+	done
 done
